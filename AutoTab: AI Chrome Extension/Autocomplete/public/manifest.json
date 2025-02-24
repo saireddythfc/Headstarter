@@ -1,0 +1,20 @@
+{
+    "manifest_version": 3,
+    "name": "Autocomplete Extension",
+    "version": "1.0",
+    "description": "Autocompletes user input using an LLM.",
+    "permissions": ["activeTab", "scripting"],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"],
+        "css": ["assets/styles.css"]
+      }
+    ],
+    "action": {
+      "default_popup": "index.html"
+    }
+  }

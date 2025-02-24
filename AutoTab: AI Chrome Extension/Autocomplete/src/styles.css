@@ -1,0 +1,16 @@
+/* Style for the suggestion overlay */
+.autocomplete-suggestion {
+  position: absolute;
+  color: lightgrey;
+  pointer-events: none;
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  z-index: 1000; /* Ensure it appears above other elements */
+}
+
+/* Style for input and textarea with suggestions */
+.suggestion {
+  color: #999; /* Light grey color */
+  position: absolute;
+  pointer-events: none; /* Ensure the suggestion doesn't interfere with typing */
+}
