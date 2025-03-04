@@ -1,5 +1,39 @@
 import "./styles.css"; // Import the CSS file
 
+const debounce = (func, wait) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
+var textboxDiv = document.querySelector('div[role="textbox"]');
+if (textboxDiv) {
+  observeTextbox(textboxDiv);
+} 
+
+function observeTextbox(divElement) {
+  // Create a MutationObserver to watch for changes in the div
+  let observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // Check if a span with data-text="true" is added
+      const spanWithDataText = divElement.querySelector('span[data-text="true"]');
+      if (spanWithDataText) {
+        // Extract the text content of the span
+        const textContent = spanWithDataText.textContent;
+        console.log("Text content of the span:", textContent);
+
+        // Apply autocomplete functionality to the span
+        handleInput(spanWithDataText);
+      }
+    });
+  });
+
+  // Start observing the div for changes
+  observer.observe(divElement, { childList: true, subtree: true });
+}
+
 export async function getLLMSuggestion(userInput) {
   if (!userInput) {
     return ""; // Return an empty string if userInput is undefined
@@ -13,7 +47,9 @@ export async function getLLMSuggestion(userInput) {
   };
 
   // Prepare the prompt for the LLM
-  const prompt = `Complete the following sentence in a meaningful way, ensuring the response is a complete sentence and does not exceed 300 characters. Use the context of the website (title: ${websiteMetadata.title}, URL: ${websiteMetadata.url}, description: ${websiteMetadata.description}) to guide your response. Here is the user's input: "${userInput}"`;
+  const prompt = `You are an AI autocomplete assistant who will suggest a completion for the user's input. Ensure the response is to only complete the user's input which may or may not be a complete sentence.
+  Here is the user's input: "${userInput}"
+  Use the context of the website (title: ${websiteMetadata.title}, URL: ${websiteMetadata.url}, description: ${websiteMetadata.description}) if necessary to guide your response.`;
 
   try {
     // Make the API call to OpenRouter
@@ -21,7 +57,7 @@ export async function getLLMSuggestion(userInput) {
       method: "POST",
       headers: {
         "Content-Type": "applications/json",
-        Authorization: "Bearer <token>", 
+        Authorization: "Bearer ", 
       },
       body: JSON.stringify({
         model: "openai/gpt-3.5-turbo", 
@@ -54,6 +90,33 @@ export async function getLLMSuggestion(userInput) {
   }
 }
 
+export async function getGeminiSuggestion(userInput) {
+  if (!userInput) {
+    return ""; // Return an empty string if userInput is undefined
+  }
+
+  // Add website metadata for context
+  const websiteMetadata = {
+    title: document.title, // Website title
+    url: window.location.href, // Current URL
+    description: document.querySelector('meta[name="description"]')?.content || "", // Meta description
+  };
+
+  // Prepare the prompt for the LLM
+  const prompt = `You are an AI autocomplete assistant who will suggest a completion for the user's input. Ensure the response is to only complete the user's input which may or may not be a complete sentence.
+  Here is the user's input: "${userInput}"
+  Use the context of the website (title: ${websiteMetadata.title}, URL: ${websiteMetadata.url}, description: ${websiteMetadata.description}) if necessary to guide your response.`;
+
+  const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+  const genAI = new GoogleGenerativeAI("");
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  const result = await model.generateContent(prompt);
+
+  return result.response.text();
+}
+
 // Helper function to check if an element is a text input
 function isTextInput(element) {
   const tagName = element.tagName.toLowerCase();
@@ -61,10 +124,11 @@ function isTextInput(element) {
 
   console.log(role);
   return (
+    //  role === 'textbox' ||
     tagName === "input" ||
     tagName === "textarea" ||
-    (tagName === "div" && element.isContentEditable) ||
-    role === 'textbox'
+    (tagName === "div" && element.isContentEditable)
+   
   );
 }
 
@@ -90,6 +154,7 @@ function displaySuggestion(inputElement, suggestion) {
   const textBeforeCursor = inputElement.value.slice(0, cursorPosition);
   const textAfterCursor = inputElement.value.slice(cursorPosition);
 
+  
   // Create a suggestion element
   const suggestionElement = document.createElement("span");
   suggestionElement.className = "suggestion";
@@ -104,11 +169,14 @@ function displaySuggestion(inputElement, suggestion) {
   const cursorLeft = inputRect.left + textBeforeCursorWidth;
   const cursorTop = inputRect.top;
 
+  const X_offset = 11.5;
+  const Y_offset = 11.5;
+
   suggestionElement.style.position = "absolute";
-  suggestionElement.style.left = `${cursorLeft}px`;
-  suggestionElement.style.top = `${cursorTop}px`;
+  suggestionElement.style.left = `${inputRect.left + textBeforeCursorWidth + X_offset + window.scrollX}px`;
+  suggestionElement.style.top = `${inputRect.top + Y_offset + window.scrollY}px`;
   suggestionElement.style.color = "#999"; // Light grey color
-  suggestionElement.style.pointerEvents = "none"; // Ensure the suggestion doesn't interfere with typing
+  // suggestionElement.style.pointerEvents = "none"; // Ensure the suggestion doesn't interfere with typing
 }
 
 // Function to calculate the width of text in an input or textarea
@@ -123,13 +191,27 @@ function getTextWidth(text, inputElement) {
 // Function to handle user input
 async function handleInput(event) {
   const inputElement = event.target;
-  const userInput = inputElement.value;
+  var userInput = inputElement.value;
 
   console.log("this is the event", event.target);
   console.log("this is user input", userInput);
 
   const element = event.target;
-  if (!isTextInput(element)) return;
+  const role = element.getAttribute('role');
+  if (!isTextInput(element) && !(element.isContentEditable)) return;
+
+  console.log("role in input", role);
+  // if (role === "textbox"){
+  //   console.log("In role check");
+  //   var ele = document.activeElement;
+  //   const spanElement = ele.querySelector('span[data-text="true"]');
+  //   if (spanElement){
+  //   userInput = spanElement.textContent;}
+  //   else{
+  //     userInput = element.text;
+  //   }
+  //   console.log("postcheck")
+  // }
 
   // Remove existing suggestions
   const existingSuggestion = inputElement.nextElementSibling;
@@ -137,10 +219,46 @@ async function handleInput(event) {
     existingSuggestion.remove();
   }
 
+  if (element.isContentEditable) {
+    console.log("this is a content editable element", element.innerText);
+    let text = '';
+    // Get all text nodes within the element
+    const walk = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+
+    let node;
+    while (node = walk.nextNode()) {
+        text += node.textContent;
+    }
+
+    userInput = text;
+    console.log("this is the user input", userInput);
+  }
+
   // If the user is typing, get a suggestion
   if (userInput.length > 3) {
-    const suggestion = await getLLMSuggestion(userInput);
-    displaySuggestion(inputElement, suggestion);
+    let suggestion;
+    try {
+      suggestion = await getGeminiSuggestion(userInput);
+    } catch (error) {
+      console.error("Error fetching suggestion from Gemini:", error);
+      suggestion = "Hey ya";
+    }
+    
+    if (suggestion) {
+      // For contentEditable divs, compute caret coordinates via Selection API
+      if (element.isContentEditable) {
+        // element.innerText += suggestion;
+        displaySuggestion(element, suggestion);
+      } else {
+        // For inputs or textareas, use your existing method
+        displaySuggestion(element, suggestion);
+      }
+    }
   } else {
     // Remove the suggestion if the input is empty
     const existingSuggestion = inputElement.nextElementSibling;
@@ -152,17 +270,27 @@ async function handleInput(event) {
 
 // Function to handle tab key press
 function handleKeyDown(event) {
-  if (event.key === "Tab") {
+
+  if (event.ctrlKey && event.key === "z") {
+    const inputElement = event.target;
+    if (inputElement.dataset.lastSuggestion) {
+      inputElement.value = inputElement.value.replace(inputElement.dataset.lastSuggestion, "");
+      delete inputElement.dataset.lastSuggestion;
+    }
+  }  
+
+  else if (event.key === "Tab") {
     const inputElement = event.target;
     const suggestionElement = inputElement.nextElementSibling;
-
+    inputElement.dataset.lastSuggestion = suggestionElement.textContent;
+    const cursorPosition = getCursorPosition(inputElement);
     // If a suggestion exists, append it to the input
     if (suggestionElement && suggestionElement.classList.contains("suggestion")) {
       event.preventDefault(); // Prevent default tab behavior
-      // const cursorPosition = getCursorPosition(inputElement);
+      const cursorPosition = getCursorPosition(inputElement);
       // const textBeforeCursor = inputElement.value.slice(0, cursorPosition);
       // const textAfterCursor = inputElement.value.slice(cursorPosition);
-      inputElement.value = suggestionElement.textContent;
+      inputElement.value += suggestionElement.textContent;
       suggestionElement.remove(); // Remove the suggestion
 
       // Move the cursor to the end of the inserted suggestion
@@ -170,8 +298,9 @@ function handleKeyDown(event) {
       inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
     }
   }
+
 }
 
 // Attach event listeners
-document.addEventListener("input", handleInput);
+document.addEventListener("input", debounce(handleInput, 5));
 document.addEventListener("keydown", handleKeyDown);

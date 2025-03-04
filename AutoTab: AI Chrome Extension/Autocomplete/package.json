@@ -2,10 +2,13 @@
     "name": "autocomplete-extension",
     "version": "1.0.0",
     "scripts": {
-      "build": "vite build",
-      "dev": "vite"
+        "build": "vite build",
+        "dev": "vite"
     },
     "devDependencies": {
-      "vite": "^4.0.0"
+        "vite": "^4.0.0"
+    },
+    "dependencies": {
+        "@google/generative-ai": "^0.23.0"
     }
-  }
+}
